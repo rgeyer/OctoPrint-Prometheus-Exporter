@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from threading import Timer
 import time
 import os
+import re
 import octoprint.plugin
 from octoprint.util.version import get_octoprint_version_string
 from octoprint.util import RepeatedTimer
@@ -42,6 +43,7 @@ class PrometheusExporterPlugin(octoprint.plugin.BlueprintPlugin,
 	# TEMP
 	temps_actual = Gauge('octoprint_temperatures_actual', 'Reported temperatures', ['identifier'], registry=_registry)
 	temps_target = Gauge('octoprint_temperatures_target', 'Targeted temperatures', ['identifier'], registry=_registry)
+	temps_power = Gauge('octoprint_temperatures_power', 'Power (Duty Cycle) of tool', ['identifier'], registry=_registry)
 
 	def get_temp_update(self, comm, parsed_temps):
 		for k, v in parsed_temps.items():
@@ -309,6 +311,25 @@ class PrometheusExporterPlugin(octoprint.plugin.BlueprintPlugin,
 			)
 		)
 
+	def get_temp_and_dutycycle(self, comm, line, *args, **kwargs):
+		TEMP_RE = re.compile("^\sT[0-9]?:(\d+\.*\d+)\s\/(\d+\.*\d+).*?B:(\d+\.\d+)\s\/(\d+\.*\d+)\s@:(\d+\.?\d?)\sB@:(\d+\.?\d?)")
+		match = TEMP_RE.match(line)
+		if match:
+			grps = match.groups()
+			# These could theoretically be used to replace the values from the
+			# temperature hook, but we're really only after the dutycycle/power
+			# ea = float(grps[0])
+			# ed = float(grps[1])
+			# ba = float(grps[2])
+			# bd = float(grps[3])
+			if len(grps) == 6:
+				edc = float(match.groups()[4])
+				bdc = float(match.groups()[5])
+				self.temps_power.labels('T0').set(edc)
+				self.temps_power.labels('B').set(bdc)
+		return line
+
+
 __plugin_name__ = "Prometheus Exporter Plugin"
 __plugin_pythoncompat__ = ">=2.7,<4"
 
@@ -320,5 +341,6 @@ def __plugin_load__():
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.protocol.temperatures.received": __plugin_implementation__.get_temp_update,
+		"octoprint.comm.protocol.gcode.received": __plugin_implementation__.get_temp_and_dutycycle,
 		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.gcodephase_hook
 	}
