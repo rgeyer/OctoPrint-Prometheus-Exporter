@@ -312,7 +312,7 @@ class PrometheusExporterPlugin(octoprint.plugin.BlueprintPlugin,
 		)
 
 	def get_temp_and_dutycycle(self, comm, line, *args, **kwargs):
-		TEMP_RE = re.compile("^\sT[0-9]?:(\d+\.*\d+)\s\/(\d+\.*\d+).*?B:(\d+\.\d+)\s\/(\d+\.*\d+)\s@:(\d+\.?\d?)\sB@:(\d+\.?\d?)")
+		TEMP_RE = re.compile("^(?:ok)?\sT[0-9]?:(\d+\.*\d+)\s\/(\d+\.*\d+).*?B:(\d+\.\d+)\s\/(\d+\.*\d+)\s.*?@:(\d+\.?\d?)\sB@:(\d+\.?\d?).*")
 		match = TEMP_RE.match(line)
 		if match:
 			grps = match.groups()
